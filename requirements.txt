@@ -1,0 +1,10 @@
+streamlit
+streamlit-authenticator
+python-dotenv
+pandas
+mysql-connector-python
+qrcode[pil]
+fpdf
+pillow
+folium
+streamlit-folium
