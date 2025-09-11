@@ -53,3 +53,7 @@ class SeedCreate(BaseModel):
     SEED_QUANTITY_COLLECTED: Optional[float]
     SpeciesCode: Optional[str]
     QRCodeURL: Optional[str]
+
+class SyncLogCreate(BaseModel):
+    TreeID: str
+    Status: str
