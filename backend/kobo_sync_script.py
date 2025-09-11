@@ -1,20 +1,20 @@
-
 import os
 import requests
-import pandas as pd
+import qrcode
 from dotenv import load_dotenv
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
-from models import Tree, SyncLog
-from datetime import datetime
+from models import Tree, Seed
 from sqlalchemy.exc import IntegrityError
+from database import Base
 
-# Load .env first
+# Load environment variables
 load_dotenv()
 
-# Access environment variables after loading
 KOBO_TOKEN = os.getenv("KOBO_TOKEN")
-KOBO_FORM_ID = os.getenv("KOBO_FORM_ID")
+TREE_FORM_ID = os.getenv("TREE_FORM_ID")
+SEED_FORM_ID = os.getenv("SEED_FORM_ID")
+
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST")
@@ -25,71 +25,89 @@ DB_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}
 engine = create_engine(DB_URL)
 SessionLocal = sessionmaker(bind=engine)
 
-KOBO_API_URL = f"https://kf.kobotoolbox.org/api/v2/assets/{KOBO_FORM_ID}/data/"
-headers = {
-    "Authorization": f"Token {KOBO_TOKEN}",
-    "Accept": "application/json"
-}
+# Lookup maps
+region_map = {"juaso": "JUA", "mampong": "MAM", "kumawu": "KUM"}
+reserve_map = {"bobiri": "BOB", "dome": "DOM", "ofhe": "OFH"}
 
-log_entries = []
-backup_data = []
-session = SessionLocal()
-try:
-    response = requests.get(KOBO_API_URL, headers=headers)
-    raw_response = response.text
+def generate_species_code(name):
+    if not name:
+        return "UNK"
+    parts = name.split()
+    return (parts[0][:3] + parts[-1][:1]).upper() if len(parts) > 1 else name[:4].upper()
 
-    # Save raw response for debugging
-    with open("kobo_raw_response.txt", "w", encoding="utf-8") as raw_file:
-        raw_file.write(raw_response)
+def generate_qr(unique_id, region, reserve, species):
+    content = f"{region}-{reserve}-{species}-{unique_id}"
+    img = qrcode.make(content)
+    path = f"static/qrcodes/{unique_id}.png"
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    img.save(path)
+    return f"https://yourdomain.com/{path}"
 
-    response.raise_for_status()
-    data = response.json()
+def filter_fields(record, model):
+    valid_keys = set(c.name for c in model.__table__.columns)
+    return {k: v for k, v in record.items() if k in valid_keys}
 
-    if "results" not in data or not data["results"]:
-        log_entries.append(f"{datetime.now()} - No submissions found. Sync skipped.")
-    else:
-        submissions = data["results"]
-        for record in submissions:
+def sync_kobo(form_id, model, is_tree=True):
+    url = f"https://kf.kobotoolbox.org/api/v2/assets/{form_id}/data/?format=json"
+    headers = {"Authorization": f"Token {KOBO_TOKEN}"}
+    session = SessionLocal()
+
+    try:
+        response = requests.get(url, headers=headers)
+        raw_response = response.text
+
+        with open("kobo_raw_response.txt", "w", encoding="utf-8") as f:
+            f.write(raw_response)
+
+        response.raise_for_status()
+        data = response.json().get("results", [])
+
+        for record in data:
             try:
-                tree = Tree(
-                    TreeID=record.get("TreeID"),
-                    GPS=record.get("GPS"),
-                    ForestName=record.get("ForestName"),
-                    TreeName=record.get("TreeName"),
-                    TreeType=record.get("TreeType"),
-                    Species=record.get("Species"),
-                    DatePlanted=record.get("DatePlanted"),
-                    Notes=record.get("Notes")
-                )
-                session.add(tree)
+                kobo_id = record.get("_id")
+                if not kobo_id:
+                    continue
+
+                region = region_map.get(record.get("DISTRICT_NAME", "").lower(), "UNK")
+                reserve = reserve_map.get(record.get("FOREST_RESERVE_NAME", "").lower(), "UNK")
+                species = record.get("SPECIES_NAME") or record.get("SPECIES")
+                species_code = generate_species_code(species)
+
+                unique_id = f"TREE-{kobo_id}" if is_tree else f"SEED-{kobo_id}"
+                qr_url = generate_qr(unique_id, region, reserve, species_code)
+
+                filtered = filter_fields(record, Tree if is_tree else Seed)
+
+                if is_tree:
+                    tree = Tree(**filtered,
+                        TreeID=unique_id,
+                        KoboID=kobo_id,
+                        RegionCode=region,
+                        ReserveCode=reserve,
+                        SpeciesCode=species_code,
+                        QRCodeURL=qr_url
+                    )
+                    session.add(tree)
+                else:
+                    seed = Seed(**filtered,
+                        SeedID=unique_id,
+                        KoboID=kobo_id,
+                        SpeciesCode=species_code,
+                        QRCodeURL=qr_url
+                    )
+                    session.add(seed)
+
                 session.commit()
-                session.refresh(tree)
-                status = "Success"
+
             except IntegrityError:
                 session.rollback()
-                status = "Duplicate or Error"
+                continue
 
-            sync_log = SyncLog(TreeID=record.get("TreeID"), Status=status)
-            session.add(sync_log)
-            session.commit()
+    except Exception as e:
+        print("Sync failed:", e)
+    finally:
+        session.close()
 
-            log_entries.append(f"{datetime.now()} - TreeID {record.get('TreeID')} - {status}")
-            backup_data.append(record)
-
-except Exception as e:
-    log_entries.append(f"{datetime.now()} - Sync failed: {str(e)}")
-finally:
-    session.close()
-
-with open("kobo_sync_log.txt", "w") as log_file:
-    for entry in log_entries:
-        log_file.write(entry + "\n")
-
-if backup_data:
-    df = pd.DataFrame(backup_data)
-    df.to_csv("kobo_backup.csv", index=False)
-    print(f"{len(backup_data)} records synced from KoboToolbox.")
-else:
-    print("No new records synced.")
-
-
+# Run both syncs
+sync_kobo(TREE_FORM_ID, Tree, is_tree=True)
+sync_kobo(SEED_FORM_ID, Seed, is_tree=False)
