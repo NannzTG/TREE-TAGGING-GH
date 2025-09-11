@@ -4,9 +4,10 @@ import qrcode
 from dotenv import load_dotenv
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
-from models import Tree, Seed
+from models import Tree, Seed, SyncLog
 from sqlalchemy.exc import IntegrityError
 from database import Base
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -14,7 +15,6 @@ load_dotenv()
 KOBO_TOKEN = os.getenv("KOBO_TOKEN")
 TREE_FORM_ID = os.getenv("TREE_FORM_ID")
 SEED_FORM_ID = os.getenv("SEED_FORM_ID")
-
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST")
@@ -35,13 +35,13 @@ def generate_species_code(name):
     parts = name.split()
     return (parts[0][:3] + parts[-1][:1]).upper() if len(parts) > 1 else name[:4].upper()
 
-def generate_qr(unique_id, region, reserve, species):
-    content = f"{region}-{reserve}-{species}-{unique_id}"
-    img = qrcode.make(content)
+def generate_qr(unique_id):
+    url = f"https://tree-tagging-gh-production.up.railway.app/scan/{unique_id}"
+    img = qrcode.make(url)
     path = f"static/qrcodes/{unique_id}.png"
     os.makedirs(os.path.dirname(path), exist_ok=True)
     img.save(path)
-    return f"https://yourdomain.com/{path}"
+    return url
 
 def filter_fields(record, model):
     valid_keys = set(c.name for c in model.__table__.columns)
@@ -55,10 +55,8 @@ def sync_kobo(form_id, model, is_tree=True):
     try:
         response = requests.get(url, headers=headers)
         raw_response = response.text
-
         with open("kobo_raw_response.txt", "w", encoding="utf-8") as f:
             f.write(raw_response)
-
         response.raise_for_status()
         data = response.json().get("results", [])
 
@@ -72,14 +70,14 @@ def sync_kobo(form_id, model, is_tree=True):
                 reserve = reserve_map.get(record.get("FOREST_RESERVE_NAME", "").lower(), "UNK")
                 species = record.get("SPECIES_NAME") or record.get("SPECIES")
                 species_code = generate_species_code(species)
-
                 unique_id = f"TREE-{kobo_id}" if is_tree else f"SEED-{kobo_id}"
-                qr_url = generate_qr(unique_id, region, reserve, species_code)
+                qr_url = generate_qr(unique_id)
 
                 filtered = filter_fields(record, Tree if is_tree else Seed)
 
                 if is_tree:
-                    tree = Tree(**filtered,
+                    tree = Tree(
+                        **filtered,
                         TreeID=unique_id,
                         KoboID=kobo_id,
                         RegionCode=region,
@@ -89,7 +87,8 @@ def sync_kobo(form_id, model, is_tree=True):
                     )
                     session.add(tree)
                 else:
-                    seed = Seed(**filtered,
+                    seed = Seed(
+                        **filtered,
                         SeedID=unique_id,
                         KoboID=kobo_id,
                         SpeciesCode=species_code,
@@ -99,9 +98,21 @@ def sync_kobo(form_id, model, is_tree=True):
 
                 session.commit()
 
+                # Log sync success
+                sync_log = SyncLog(TreeID=unique_id, Status="Success", Timestamp=datetime.utcnow())
+                session.add(sync_log)
+                session.commit()
+
             except IntegrityError:
                 session.rollback()
-                continue
+                sync_log = SyncLog(TreeID=unique_id, Status="Duplicate", Timestamp=datetime.utcnow())
+                session.add(sync_log)
+                session.commit()
+            except Exception as e:
+                session.rollback()
+                sync_log = SyncLog(TreeID=unique_id, Status=f"Error: {str(e)}", Timestamp=datetime.utcnow())
+                session.add(sync_log)
+                session.commit()
 
     except Exception as e:
         print("Sync failed:", e)
