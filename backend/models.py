@@ -1,9 +1,9 @@
-from sqlalchemy import Column, String, Date, Float, Text, Integer, ForeignKey
+from sqlalchemy import Column, String, Date, Float, Text, Integer, ForeignKey, DateTime
 from database import Base
+from datetime import datetime
 
 class Tree(Base):
     __tablename__ = "trees"
-
     TreeID = Column(String(50), primary_key=True)
     KoboID = Column(Integer, unique=True)
     GPS = Column(String(100))
@@ -42,7 +42,6 @@ class Tree(Base):
 
 class Seed(Base):
     __tablename__ = "seeds"
-
     SeedID = Column(String(100), primary_key=True)
     KoboID = Column(Integer, unique=True)
     ParentTreeID = Column(String(100), ForeignKey("trees.TreeID"))
@@ -56,3 +55,10 @@ class Seed(Base):
     SEED_QUANTITY_COLLECTED = Column(Float)
     SpeciesCode = Column(String(100))
     QRCodeURL = Column(Text)
+
+class SyncLog(Base):
+    __tablename__ = "synclog"
+    SyncID = Column(Integer, primary_key=True, autoincrement=True)
+    TreeID = Column(String(50), ForeignKey("trees.TreeID"))
+    Timestamp = Column(DateTime, default=datetime.utcnow)
+    Status = Column(String(50))
