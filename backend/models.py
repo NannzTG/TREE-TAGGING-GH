@@ -6,13 +6,13 @@ class Tree(Base):
     __tablename__ = "trees"
     TreeID = Column(String(50), primary_key=True)
     KoboID = Column(Integer, unique=True)
-    TreeName = Column(String(100))  # ✅ Added missing column
+    TreeName = Column(String(100))
     GPS = Column(String(100))
     ForestName = Column(String(100))
     TreeType = Column(String(100))
     Species = Column(String(100))
     DatePlanted = Column(Date)
-    Notes = Column(Text)
+    NOTES = Column(Text)  # ✅ Corrected capitalization
     COLLECTOR_NAME = Column(String(100))
     DATE_OF_MOTHER_TREE_ID = Column(Date)
     DISTRICT_NAME = Column(String(100))
@@ -28,6 +28,7 @@ class Tree(Base):
     EVIDENCE_OF_DISEASE_PEST = Column(Text)
     FLOWER_FRUITING_STATUS_OF_MOTH = Column(Text)
     ACCESSIBILITY_FOR_IDENTIFYING = Column(Text)
+    ACCESSIBILITY_FOR_IDENTIFYING_ = Column(Text)
     MOTHER_TREE_BARCODE_SCAN = Column(Text)
     MOTHER_TREE_MAIN_PHOTO = Column(Text)
     MOTHER_TREE_NORTH_PHOTO = Column(Text)
@@ -39,6 +40,14 @@ class Tree(Base):
     ReserveCode = Column(String(100))
     SpeciesCode = Column(String(100))
     QRCodeURL = Column(Text)
+
+    # ✅ Optional Kobo metadata fields
+    start = Column(Text)
+    end = Column(Text)
+    today = Column(Text)
+    username = Column(Text)
+    deviceid = Column(Text)
+    phonenumber = Column(Text)
 
 class Seed(Base):
     __tablename__ = "seeds"
