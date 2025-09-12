@@ -72,18 +72,4 @@ def export_tree_tags_to_pdf(dataframe):
 st.set_page_config(page_title="Tree Logging Dashboard", layout="wide")
 st.title("🌳 3T Tree & Seed Tagging Dashboard")
 
-df = fetch_tree_data()
-
-# -------------------------------
-# 🖼 BRANDING & LOGO
-# -------------------------------
-with st.sidebar:
-    try:
-        st.markdown("https://3t.eco", unsafe_allow_html=True)
-    except:
-        st.warning("Logo failed to load.")
-    st.markdown("### **3T Tree Tagging System**")
-    st.markdown("*Built for smart forest monitoring 🌍*")
-    st.markdown("---")
-
 #
