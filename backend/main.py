@@ -6,8 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine, Base
 import models, schemas, crud
-import subprocess
-import os
+from kobo_sync_script import sync_kobo, TREE_FORM_ID, SEED_FORM_ID, Tree, Seed
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -15,7 +14,7 @@ Base.metadata.create_all(bind=engine)
 # Initialize FastAPI app
 app = FastAPI()
 
-# Mount static folder (optional, for QR codes or images)
+# Mount static folder (for QR codes or images)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Set up Jinja2 templates
@@ -65,26 +64,15 @@ def scan_tree(tree_id: str, request: Request, db: Session = Depends(get_db)):
         "photos": photos
     })
 
-# GET: Trigger Kobo Sync Script
+# ✅ GET: Trigger Kobo Sync Script directly
 @app.get("/sync-kobo")
 def sync_kobo_data():
     try:
-        python_path = os.path.join(os.getcwd(), "venv", "Scripts", "python.exe")
-        result = subprocess.run(
-            [python_path, "kobo_sync_script.py"],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        return JSONResponse(content={
-            "status": "success",
-            "message": result.stdout
-        })
-    except subprocess.CalledProcessError as e:
-        return JSONResponse(status_code=500, content={
-            "status": "error",
-            "message": e.stderr
-        })
+        sync_kobo(TREE_FORM_ID, Tree, is_tree=True)
+        sync_kobo(SEED_FORM_ID, Seed, is_tree=False)
+        return {"status": "Sync completed"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # DELETE: Tree by TreeID
 @app.delete("/trees/{tree_id}")
