@@ -72,4 +72,9 @@ def export_tree_tags_to_pdf(dataframe):
 st.set_page_config(page_title="Tree Logging Dashboard", layout="wide")
 st.title("🌳 3T Tree & Seed Tagging Dashboard")
 
-#
+# -------------------------------
+# 🧪 DEBUG: Test MySQL Connection
+# -------------------------------
+try:
+    df = fetch_tree_data()
+   
