@@ -127,13 +127,13 @@ with st.sidebar.expander("🌳 Tree Filters", expanded=True):
     for col, label in tree_text_columns.items():
         if col in df.columns:
             options = df[col].dropna().unique()
-            tree_filters[col] = st.selectbox(label, options=[""] + list(options))
+            tree_filters[col] = st.selectbox(label, options=[""] + list(options), key=f"tree_{col}")
 
 with st.sidebar.expander("🌱 Seed Filters", expanded=False):
     for col, label in seed_text_columns.items():
         if col in df.columns:
             options = df[col].dropna().unique()
-            seed_filters[col] = st.selectbox(label, options=[""] + list(options))
+            seed_filters[col] = st.selectbox(label, options=[""] + list(options), key=f"seed_{col}")
 
 if st.sidebar.button("🔄 Reset All Filters"):
     st.experimental_rerun()
