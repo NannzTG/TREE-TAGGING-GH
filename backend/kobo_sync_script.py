@@ -88,7 +88,6 @@ def sync_kobo(form_id, model, is_tree=True):
                 gps = f"{lat},{lon}" if lat and lon else None
                 record["GPS"] = gps
 
-                # ✅ Filter and inject GPS explicitly
                 filtered = filter_fields(record, Tree if is_tree else Seed)
                 filtered["GPS"] = gps  # Ensure GPS is included
 
@@ -121,11 +120,17 @@ def sync_kobo(form_id, model, is_tree=True):
 
             except IntegrityError:
                 session.rollback()
-                sync_log = SyncLog(TreeID=unique_id, Status="Duplicate", Timestamp=datetime.utcnow())
+                # ✅ Update GPS if record already exists
+                if is_tree:
+                    existing = session.query(Tree).filter_by(TreeID=unique_id).first()
+                    if existing:
+                        existing.GPS = gps
+                        session.commit()
+                sync_log = SyncLog(TreeID=unique_id, Status="Updated", Timestamp=datetime.utcnow())
                 session.add(sync_log)
                 session.commit()
-                print(f"⚠️ Duplicate record {unique_id}")
-                logging.warning(f"Duplicate record {unique_id}")
+                print(f"⚠️ Updated existing record {unique_id}")
+                logging.warning(f"Updated existing record {unique_id}")
             except Exception as e:
                 session.rollback()
                 sync_log = SyncLog(TreeID=unique_id, Status=f"Error: {str(e)}", Timestamp=datetime.utcnow())
