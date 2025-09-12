@@ -88,7 +88,9 @@ def sync_kobo(form_id, model, is_tree=True):
                 gps = f"{lat},{lon}" if lat and lon else None
                 record["GPS"] = gps
 
+                # ✅ Filter and inject GPS explicitly
                 filtered = filter_fields(record, Tree if is_tree else Seed)
+                filtered["GPS"] = gps  # Ensure GPS is included
 
                 if is_tree:
                     tree = Tree(
