@@ -1,6 +1,7 @@
 import os
 import requests
 import qrcode
+import logging
 from dotenv import load_dotenv
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
@@ -8,8 +9,10 @@ from models import Tree, Seed, SyncLog
 from sqlalchemy.exc import IntegrityError
 from database import Base
 from datetime import datetime
+# ✅ Setup logging
+logging.basicConfig(filename="sync_log.txt", level=logging.INFO, format="%(asctime)s - %(message)s")
 
-# Load environment variables
+# ✅ Load environment variables
 load_dotenv()
 
 KOBO_TOKEN = os.getenv("KOBO_TOKEN")
@@ -25,7 +28,7 @@ DB_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}
 engine = create_engine(DB_URL)
 SessionLocal = sessionmaker(bind=engine)
 
-# Lookup maps
+# ✅ Lookup maps
 region_map = {"juaso": "JUA", "mampong": "MAM", "kumawu": "KUM"}
 reserve_map = {"bobiri": "BOB", "dome": "DOM", "ofhe": "OFH"}
 
@@ -73,6 +76,8 @@ def sync_kobo(form_id, model, is_tree=True):
                 unique_id = f"TREE-{kobo_id}" if is_tree else f"SEED-{kobo_id}"
                 qr_url = generate_qr(unique_id)
 
+                logging.info(f"Processing record {unique_id}")
+
                 filtered = filter_fields(record, Tree if is_tree else Seed)
 
                 if is_tree:
@@ -98,7 +103,6 @@ def sync_kobo(form_id, model, is_tree=True):
 
                 session.commit()
 
-                # Log sync success
                 sync_log = SyncLog(TreeID=unique_id, Status="Success", Timestamp=datetime.utcnow())
                 session.add(sync_log)
                 session.commit()
@@ -108,17 +112,19 @@ def sync_kobo(form_id, model, is_tree=True):
                 sync_log = SyncLog(TreeID=unique_id, Status="Duplicate", Timestamp=datetime.utcnow())
                 session.add(sync_log)
                 session.commit()
+                logging.warning(f"Duplicate record {unique_id}")
             except Exception as e:
                 session.rollback()
                 sync_log = SyncLog(TreeID=unique_id, Status=f"Error: {str(e)}", Timestamp=datetime.utcnow())
                 session.add(sync_log)
                 session.commit()
+                logging.error(f"Error syncing {unique_id}: {str(e)}")
 
     except Exception as e:
-        print("Sync failed:", e)
+        logging.critical(f"Sync failed: {str(e)}")
     finally:
         session.close()
 
-# Run both syncs
+# ✅ Run both syncs
 sync_kobo(TREE_FORM_ID, Tree, is_tree=True)
 sync_kobo(SEED_FORM_ID, Seed, is_tree=False)
