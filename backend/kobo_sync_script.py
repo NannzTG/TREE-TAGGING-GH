@@ -9,6 +9,7 @@ from models import Tree, Seed, SyncLog
 from sqlalchemy.exc import IntegrityError
 from database import Base
 from datetime import datetime
+
 # ✅ Setup logging
 logging.basicConfig(filename="sync_log.txt", level=logging.INFO, format="%(asctime)s - %(message)s")
 
@@ -51,6 +52,7 @@ def filter_fields(record, model):
     return {k: v for k, v in record.items() if k in valid_keys}
 
 def sync_kobo(form_id, model, is_tree=True):
+    print(f"🔄 Starting sync for {'Tree' if is_tree else 'Seed'} form...")
     url = f"https://kf.kobotoolbox.org/api/v2/assets/{form_id}/data/?format=json"
     headers = {"Authorization": f"Token {KOBO_TOKEN}"}
     session = SessionLocal()
@@ -62,6 +64,7 @@ def sync_kobo(form_id, model, is_tree=True):
             f.write(raw_response)
         response.raise_for_status()
         data = response.json().get("results", [])
+        print(f"✅ Fetched {len(data)} records from Kobo")
 
         for record in data:
             try:
@@ -76,6 +79,7 @@ def sync_kobo(form_id, model, is_tree=True):
                 unique_id = f"TREE-{kobo_id}" if is_tree else f"SEED-{kobo_id}"
                 qr_url = generate_qr(unique_id)
 
+                print(f"📦 Processing record {unique_id}")
                 logging.info(f"Processing record {unique_id}")
 
                 filtered = filter_fields(record, Tree if is_tree else Seed)
@@ -112,15 +116,18 @@ def sync_kobo(form_id, model, is_tree=True):
                 sync_log = SyncLog(TreeID=unique_id, Status="Duplicate", Timestamp=datetime.utcnow())
                 session.add(sync_log)
                 session.commit()
+                print(f"⚠️ Duplicate record {unique_id}")
                 logging.warning(f"Duplicate record {unique_id}")
             except Exception as e:
                 session.rollback()
                 sync_log = SyncLog(TreeID=unique_id, Status=f"Error: {str(e)}", Timestamp=datetime.utcnow())
                 session.add(sync_log)
                 session.commit()
+                print(f"❌ Error syncing {unique_id}: {str(e)}")
                 logging.error(f"Error syncing {unique_id}: {str(e)}")
 
     except Exception as e:
+        print(f"❌ Sync failed: {str(e)}")
         logging.critical(f"Sync failed: {str(e)}")
     finally:
         session.close()
