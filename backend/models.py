@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Date, Float, Text, Integer, ForeignKey, DateTime
+from sqlalchemy import Column, String, Date, Float, Text, Integer, DateTime
 from database import Base
 from datetime import datetime
 
@@ -6,9 +6,9 @@ class Tree(Base):
     __tablename__ = "trees"
     TreeID = Column(String(50), primary_key=True)
     KoboID = Column(Integer, unique=True)
+    TreeName = Column(String(100))  # ✅ Added missing column
     GPS = Column(String(100))
     ForestName = Column(String(100))
-    TreeName = Column(String(100))
     TreeType = Column(String(100))
     Species = Column(String(100))
     DatePlanted = Column(Date)
@@ -44,7 +44,7 @@ class Seed(Base):
     __tablename__ = "seeds"
     SeedID = Column(String(100), primary_key=True)
     KoboID = Column(Integer, unique=True)
-    ParentTreeID = Column(String(100), ForeignKey("trees.TreeID"))
+    ParentTreeID = Column(String(100))  # ✅ Removed ForeignKey constraint
     DateCollected = Column(Date)
     LocationFound = Column(String(100))
     Notes = Column(Text)
@@ -59,6 +59,6 @@ class Seed(Base):
 class SyncLog(Base):
     __tablename__ = "synclog"
     SyncID = Column(Integer, primary_key=True, autoincrement=True)
-    TreeID = Column(String(50), ForeignKey("trees.TreeID"))
+    TreeID = Column(String(255))  # ✅ Removed ForeignKey constraint
     Timestamp = Column(DateTime, default=datetime.utcnow)
-    Status = Column(String(50))
+    Status = Column(Text)  # ✅ Increased from String(50) to Text
