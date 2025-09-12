@@ -82,6 +82,15 @@ def sync_kobo(form_id, model, is_tree=True):
                 print(f"📦 Processing record {unique_id}")
                 logging.info(f"Processing record {unique_id}")
 
+                # ✅ GPS extraction logic
+                raw_gps = record.get("GPS location of Mother Tree")
+                if raw_gps:
+                    parts = raw_gps.strip().split()
+                    gps = f"{parts[0]},{parts[1]}" if len(parts) >= 2 else None
+                else:
+                    gps = None
+                record["GPS"] = gps
+
                 filtered = filter_fields(record, Tree if is_tree else Seed)
 
                 if is_tree:
