@@ -82,14 +82,7 @@ def sync_kobo(form_id, model, is_tree=True):
                 print(f"📦 Processing record {unique_id}")
                 logging.info(f"Processing record {unique_id}")
 
-                # ✅ GPS extraction from separate lat/lon fields
-                lat = record.get("_GPS location of Mother Tree_latitude")
-                lon = record.get("_GPS location of Mother Tree_longitude")
-                gps = f"{lat},{lon}" if lat and lon else None
-                record["GPS"] = gps
-
                 filtered = filter_fields(record, Tree if is_tree else Seed)
-                filtered["GPS"] = gps  # Ensure GPS is included
 
                 if is_tree:
                     tree = Tree(
@@ -120,17 +113,11 @@ def sync_kobo(form_id, model, is_tree=True):
 
             except IntegrityError:
                 session.rollback()
-                # ✅ Update GPS if record already exists
-                if is_tree:
-                    existing = session.query(Tree).filter_by(TreeID=unique_id).first()
-                    if existing:
-                        existing.GPS = gps
-                        session.commit()
-                sync_log = SyncLog(TreeID=unique_id, Status="Updated", Timestamp=datetime.utcnow())
+                sync_log = SyncLog(TreeID=unique_id, Status="Duplicate", Timestamp=datetime.utcnow())
                 session.add(sync_log)
                 session.commit()
-                print(f"⚠️ Updated existing record {unique_id}")
-                logging.warning(f"Updated existing record {unique_id}")
+                print(f"⚠️ Duplicate record {unique_id}")
+                logging.warning(f"Duplicate record {unique_id}")
             except Exception as e:
                 session.rollback()
                 sync_log = SyncLog(TreeID=unique_id, Status=f"Error: {str(e)}", Timestamp=datetime.utcnow())
