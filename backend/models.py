@@ -12,7 +12,7 @@ class Tree(Base):
     TreeType = Column(String(100))
     Species = Column(String(100))
     DatePlanted = Column(Date)
-    NOTES = Column(Text)  # ✅ Corrected capitalization
+    NOTES = Column(Text)
     COLLECTOR_NAME = Column(String(100))
     DATE_OF_MOTHER_TREE_ID = Column(Date)
     DISTRICT_NAME = Column(String(100))
@@ -41,7 +41,7 @@ class Tree(Base):
     SpeciesCode = Column(String(100))
     QRCodeURL = Column(Text)
 
-    # ✅ Optional Kobo metadata fields
+    # Kobo metadata fields
     start = Column(Text)
     end = Column(Text)
     today = Column(Text)
@@ -53,7 +53,7 @@ class Seed(Base):
     __tablename__ = "seeds"
     SeedID = Column(String(100), primary_key=True)
     KoboID = Column(Integer, unique=True)
-    ParentTreeID = Column(String(100))  # ✅ Removed ForeignKey constraint
+    ParentTreeID = Column(String(100))
     DateCollected = Column(Date)
     LocationFound = Column(String(100))
     Notes = Column(Text)
@@ -68,6 +68,12 @@ class Seed(Base):
 class SyncLog(Base):
     __tablename__ = "synclog"
     SyncID = Column(Integer, primary_key=True, autoincrement=True)
-    TreeID = Column(String(255))  # ✅ Removed ForeignKey constraint
+    TreeID = Column(String(255))
     Timestamp = Column(DateTime, default=datetime.utcnow)
-    Status = Column(Text)  # ✅ Increased from String(50) to Text
+    Status = Column(Text)
+
+class KoboRawResponse(Base):
+    __tablename__ = "kobo_raw_response"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    response_json = Column(Text)
+    timestamp = Column(DateTime, default=datetime.utcnow)
