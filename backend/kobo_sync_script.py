@@ -1,3 +1,4 @@
+
 import os
 import requests
 import qrcode
@@ -10,10 +11,10 @@ from sqlalchemy.exc import IntegrityError
 from database import Base
 from datetime import datetime
 
-# ✅ Setup logging
+# Setup logging
 logging.basicConfig(filename="sync_log.txt", level=logging.INFO, format="%(asctime)s - %(message)s")
 
-# ✅ Load environment variables
+# Load environment variables
 load_dotenv()
 
 KOBO_TOKEN = os.getenv("KOBO_TOKEN")
@@ -29,7 +30,7 @@ DB_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}
 engine = create_engine(DB_URL)
 SessionLocal = sessionmaker(bind=engine)
 
-# ✅ Lookup maps
+# Lookup maps
 region_map = {"juaso": "JUA", "mampong": "MAM", "kumawu": "KUM"}
 reserve_map = {"bobiri": "BOB", "dome": "DOM", "ofhe": "OFH"}
 
@@ -40,7 +41,7 @@ def generate_species_code(name):
     return (parts[0][:3] + parts[-1][:1]).upper() if len(parts) > 1 else name[:4].upper()
 
 def generate_qr(unique_id):
-    url = f"https://tree-tagging-gh-production.up.railway.app/scan/{unique_id}"
+    url = f"https://tree-tagging-gh.streamlit.app/?TreeID={unique_id}"
     img = qrcode.make(url)
     path = f"static/qrcodes/{unique_id}.png"
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -50,6 +51,12 @@ def generate_qr(unique_id):
 def filter_fields(record, model):
     valid_keys = set(c.name for c in model.__table__.columns)
     return {k: v for k, v in record.items() if k in valid_keys}
+
+def clean_gps(raw_gps):
+    parts = raw_gps.split()
+    if len(parts) >= 2:
+        return f"{parts[0]},{parts[1]}"
+    return ""
 
 def sync_kobo(form_id, model, is_tree=True):
     print(f"🔄 Starting sync for {'Tree' if is_tree else 'Seed'} form...")
@@ -85,6 +92,9 @@ def sync_kobo(form_id, model, is_tree=True):
                 filtered = filter_fields(record, Tree if is_tree else Seed)
 
                 if is_tree:
+                    raw_gps = record.get("GPS", "")
+                    filtered["GPS"] = clean_gps(raw_gps)
+
                     tree = Tree(
                         **filtered,
                         TreeID=unique_id,
@@ -132,6 +142,6 @@ def sync_kobo(form_id, model, is_tree=True):
     finally:
         session.close()
 
-# ✅ Run both syncs
+# Run both syncs
 sync_kobo(TREE_FORM_ID, Tree, is_tree=True)
 sync_kobo(SEED_FORM_ID, Seed, is_tree=False)
