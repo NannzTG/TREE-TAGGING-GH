@@ -52,7 +52,7 @@ def generate_qr_image(tree_id):
     qr = qrcode.make(url)
     return qr
 
-# Export PDF with table layout and QR codes
+# ✅ Corrected PDF export function
 def export_tree_tags_to_pdf(dataframe):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -90,114 +90,5 @@ def export_tree_tags_to_pdf(dataframe):
         pdf.cell(40, 30, "", border=1)
         pdf.ln(30)
 
-    pdf_buf = BytesIO()
-    pdf.output(pdf_buf)
-    pdf_buf.seek(0)
-    return pdf_buf
-
-# Streamlit UI
-st.set_page_config(page_title="Tree Logging Dashboard", layout="wide")
-st.title("🌳 3T Tree & Seed Tagging Dashboard")
-
-# Load data
-try:
-    df = fetch_tree_data()
-    st.success(f"✅ Data loaded: {df.shape[0]} rows, {df.shape[1]} columns")
-    if df.empty:
-        st.warning("⚠️ No data found in the database. Please check your sync or table.")
-except Exception as e:
-    st.error("❌ Could not connect to the database or load data.")
-    st.exception(e)
-    df = pd.DataFrame()
-
-# Sidebar branding
-with st.sidebar:
-    st.markdown("https://3t.eco", unsafe_allow_html=True)
-    st.markdown("### **3T Tree Tagging System**")
-    st.markdown("*Built for smart forest monitoring 🌍*")
-    st.markdown("---")
-
-# Sidebar filters
-tree_text_columns = {
-    "TreeID": "📌 TreeID",
-    "GPS": "📍 GPS",
-    "COLLECTOR_NAME": "🧑‍🌾 Collector Name",
-    "DISTRICT_NAME": "🌍 District Name",
-    "FOREST_RESERVE_NAME": "🌲 Forest Reserve Name",
-    "SPECIES_NAME": "🧬 Species Name",
-    "LOT_CODE": "📦 Lot Code",
-    "RegionCode": "🗺 Region Code"
-}
-
-tree_filters = {}
-with st.sidebar.expander("🌳 Tree Filters", expanded=True):
-    for col, label in tree_text_columns.items():
-        if col in df.columns:
-            options = df[col].dropna().unique()
-            tree_filters[col] = st.selectbox(label, options=[""] + list(options), key=f"tree_{col}")
-
-if st.sidebar.button("🔄 Reset All Filters"):
-    st.experimental_rerun()
-
-# Apply filters
-filtered_df = df.copy()
-for col, selected_value in tree_filters.items():
-    if selected_value:
-        filtered_df = filtered_df[filtered_df[col] == selected_value]
-
-# Query param filter
-query_params = st.query_params
-tree_id_filter = query_params.get("TreeID")
-if tree_id_filter and tree_id_filter in filtered_df["TreeID"].values:
-    filtered_df = filtered_df[filtered_df["TreeID"] == tree_id_filter]
-
-# Display data
-st.subheader("📋 Tree Records")
-st.dataframe(filtered_df, use_container_width=True)
-
-# Log viewer
-st.subheader("📜 Sync Logs")
-log_choice = st.selectbox("Choose log file", ["kobo_sync_log.txt", "fastapi_log.txt"])
-log_content = read_log_file(log_choice)
-st.text_area("Log Output", log_content, height=300)
-
-# Map display
-st.subheader("🗺 Tree Locations Map")
-map_df = filtered_df.copy()
-map_df = map_df[map_df.get("GPS", "").notnull() & map_df.get("GPS", "").str.contains(",")]
-if not map_df.empty:
-    lat, lon = map_df.iloc[0].get("GPS", "0,0").split(",")
-    m = folium.Map(location=[float(lat), float(lon)], zoom_start=12)
-    for _, row in map_df.iterrows():
-        try:
-            lat, lon = row.get("GPS", "0,0").split(",")
-            popup = f"{row.get('TreeID', '')} - {row.get('TreeName', '')} ({row.get('SPECIES_NAME', '')})"
-            tooltip = row.get("FOREST_RESERVE_NAME", "")
-            folium.Marker(location=[float(lat), float(lon)], popup=popup, tooltip=tooltip).add_to(m)
-        except:
-            continue
-    st_folium(m, width=700, height=500)
-else:
-    st.info("No valid GPS data available to display on map.")
-
-# QR previews
-st.subheader("🔳 QR Code Previews")
-for _, row in filtered_df.iterrows():
-    st.markdown(f"*TreeID:* {row.get('TreeID', '')} | *Tree Name:* {row.get('TreeName', '')} | *Species:* {row.get('SPECIES_NAME', '')}")
-    img = generate_qr_image(row.get('TreeID', 'UNKNOWN'))
-    buf = BytesIO()
-    img.save(buf, format="PNG")
-    st.image(buf.getvalue(), width=100)
-
-# PDF export button
-if not filtered_df.empty:
-    pdf_data = export_tree_tags_to_pdf(filtered_df)
-    st.download_button(
-        label="📄 Download Tree Tags PDF",
-        data=pdf_data,
-        file_name="tree_tags.pdf",
-        mime="application/pdf"
-    )
-
-st.markdown("---")
-st.markdown("<small><center>Developed by Nannz for 3T</center></small>", unsafe_allow_html=True)
+    pdf_bytes = pdf.output(dest='S').encode('latin1')
+    return BytesIO(pdf_bytes)
