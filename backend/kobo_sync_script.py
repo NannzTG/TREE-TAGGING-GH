@@ -50,18 +50,23 @@ def filter_fields(record, model):
     valid_keys = set(c.name for c in model.__table__.columns)
     return {k: v for k, v in record.items() if k in valid_keys}
 
+# ✅ Updated clean_gps function
 def clean_gps(record):
-    raw_gps = record.get("GPS location of Mother Tree")
+    geo = record.get("_geolocation")
+    if geo and isinstance(geo, list) and len(geo) == 2 and all(geo):
+        cleaned = f"{geo[0]},{geo[1]}"
+        print(f"✅ Cleaned GPS from _geolocation for record {record.get('_id')}: {cleaned}")
+        return cleaned
+
+    raw_gps = record.get("GPS_LOCATION")
     if raw_gps:
         parts = raw_gps.split()
         if len(parts) >= 2:
             cleaned = f"{parts[0]},{parts[1]}"
-            print(f"✅ Cleaned GPS for record {record.get('_id')}: {cleaned}")
+            print(f"✅ Cleaned GPS from GPS_LOCATION for record {record.get('_id')}: {cleaned}")
             return cleaned
-        else:
-            print(f"⚠️ Malformed GPS for record {record.get('_id')}: {raw_gps}")
-    else:
-        print(f"❌ Missing GPS for record {record.get('_id')}")
+
+    print(f"❌ Missing GPS for record {record.get('_id')}")
     return ""
 
 def sync_kobo(form_id, model, is_tree=True):
