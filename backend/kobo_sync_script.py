@@ -30,7 +30,6 @@ DB_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}
 engine = create_engine(DB_URL)
 SessionLocal = sessionmaker(bind=engine)
 
-# Lookup maps
 region_map = {"juaso": "JUA", "mampong": "MAM", "kumawu": "KUM"}
 reserve_map = {"bobiri": "BOB", "dome": "DOM", "ofhe": "OFH"}
 
@@ -52,10 +51,18 @@ def filter_fields(record, model):
     valid_keys = set(c.name for c in model.__table__.columns)
     return {k: v for k, v in record.items() if k in valid_keys}
 
-def clean_gps(raw_gps):
-    parts = raw_gps.split()
-    if len(parts) >= 2:
-        return f"{parts[0]},{parts[1]}"
+def clean_gps(record):
+    raw_gps = record.get("GPS location of Mother Tree")
+    if raw_gps:
+        parts = raw_gps.split()
+        if len(parts) >= 2:
+            cleaned = f"{parts[0]},{parts[1]}"
+            print(f"✅ Cleaned GPS for record {record.get('_id')}: {cleaned}")
+            return cleaned
+        else:
+            print(f"⚠️ Malformed GPS for record {record.get('_id')}: {raw_gps}")
+    else:
+        print(f"❌ Missing GPS for record {record.get('_id')}")
     return ""
 
 def sync_kobo(form_id, model, is_tree=True):
@@ -92,9 +99,7 @@ def sync_kobo(form_id, model, is_tree=True):
                 filtered = filter_fields(record, Tree if is_tree else Seed)
 
                 if is_tree:
-                    raw_gps = record.get("GPS", "")
-                    filtered["GPS"] = clean_gps(raw_gps)
-
+                    filtered["GPS"] = clean_gps(record)
                     tree = Tree(
                         **filtered,
                         TreeID=unique_id,
