@@ -52,7 +52,7 @@ def generate_qr_image(tree_id):
     qr = qrcode.make(url)
     return qr
 
-# Export PDF with table layout and QR codes
+# ✅ Corrected PDF export function
 def export_tree_tags_to_pdf(dataframe):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -90,10 +90,8 @@ def export_tree_tags_to_pdf(dataframe):
         pdf.cell(40, 30, "", border=1)
         pdf.ln(30)
 
-    pdf_buf = BytesIO()
-    pdf.output(pdf_buf)
-    pdf_buf.seek(0)
-    return pdf_buf
+    pdf_bytes = pdf.output(dest='S').encode('latin1')
+    return BytesIO(pdf_bytes)
 
 # Streamlit UI
 st.set_page_config(page_title="Tree Logging Dashboard", layout="wide")
